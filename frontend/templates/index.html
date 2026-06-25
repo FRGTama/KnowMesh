@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student RAG Assistant</title>
+</head>
+<body>
+<h1>Student RAG Assistant</h1>
+
+<h2>Upload Materials</h2>
+<form action="/upload" method="post" enctype="multipart/form-data">
+  <label>
+    File:
+    <input type="file" name="file" required>
+  </label>
+  <label>
+    Strategy:
+    <select name="strategy">
+      <option value="recursive">Recursive</option>
+      <option value="semantic">Semantic</option>
+    </select>
+  </label>
+  <button type="submit">Upload</button>
+</form>
+
+<h2>Ask a Question</h2>
+<form action="/query" method="post">
+  <label>
+    Question:
+    <input type="text" name="query" size="60" required>
+  </label>
+  <button type="submit">Ask</button>
+</form>
+
+{% if answer %}
+<h2>Answer</h2>
+<div>{{ answer }}</div>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,8 @@
+from backend.rag.ingestion.pipeline import process_query
+from backend.llm import generate_response
+
+
+def ask(query: str, top_k: int = 5) -> str:
+    results = process_query(query, top_k)
+    contexts = [r["text"] for r in results]
+    return generate_response(contexts, query)
