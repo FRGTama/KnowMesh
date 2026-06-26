@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { query, uploadFile, getCollectionInfo, clearDatabase } from './api'
+import { useState, useEffect, useCallback } from 'react'
+import { query, uploadFile, getCollectionInfo, clearDatabase, fetchDocuments, deleteDocument } from './api'
 import UploadForm from './components/UploadForm'
 import QueryForm from './components/QueryForm'
 import ClearDatabase from './components/ClearDatabase'
 import AnswerDisplay from './components/AnswerDisplay'
 import FlashMessage from './components/FlashMessage'
+import DocumentList from './components/DocumentList'
 
 export default function App() {
   const [answer, setAnswer] = useState('')
@@ -12,6 +13,18 @@ export default function App() {
   const [uploading, setUploading] = useState(false)
   const [querying, setQuerying] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [docs, setDocs] = useState([])
+
+  const fetchDocs = useCallback(async () => {
+    try {
+      const data = await fetchDocuments()
+      setDocs(data)
+    } catch (err) {
+      console.error('Failed to fetch documents:', err)
+    }
+  }, [])
+
+  useEffect(() => { fetchDocs() }, [fetchDocs])
 
   const showMessage = (type, text) => setMessage({ type, text })
   const dismissMessage = () => setMessage({ type: '', text: '' })
@@ -21,10 +34,20 @@ export default function App() {
     try {
       await uploadFile(file, strategy)
       showMessage('success', `Uploaded "${file.name}" successfully.`)
+      await fetchDocs()
     } catch (err) {
       showMessage('error', `Upload failed: ${err.message}`)
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDeleteDoc = async (docId) => {
+    try {
+      await deleteDocument(docId)
+      await fetchDocs()
+    } catch (err) {
+      showMessage('error', `Delete failed: ${err.message}`)
     }
   }
 
@@ -59,6 +82,7 @@ export default function App() {
       <h1>KnowMesh — Student RAG Assistant</h1>
       <FlashMessage type={message.type} text={message.text} onDismiss={dismissMessage} />
       <UploadForm onUpload={handleUpload} uploading={uploading} />
+      <DocumentList docs={docs} onDelete={handleDeleteDoc} />
       <QueryForm onQuery={handleQuery} querying={querying} />
       <ClearDatabase onClear={handleClear} clearing={clearing} />
       <AnswerDisplay text={answer} />

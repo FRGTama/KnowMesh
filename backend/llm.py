@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+
 
 load_dotenv()
 
@@ -14,6 +14,7 @@ EMBED_MODEL="all-MiniLM-L6-v2"
 def _get_model():
     global _embedding_model
     if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
         _embedding_model = SentenceTransformer(EMBED_MODEL)
     return _embedding_model
 

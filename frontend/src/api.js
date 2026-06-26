@@ -24,3 +24,13 @@ export async function clearDatabase() {
   const res = await fetch('/clear', { method: 'POST' })
   return res.json()
 }
+
+export async function fetchDocuments() {
+  const res = await fetch('/documents')
+  return res.json()
+}
+
+export async function deleteDocument(id) {
+  const res = await fetch(`/documents/${id}`, { method: 'DELETE' })
+  return res.json()
+}

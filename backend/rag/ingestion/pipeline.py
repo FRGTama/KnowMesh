@@ -51,8 +51,9 @@ class Pipeline:
             for doc in documents:
                 if doc.metadata.get("error"):
                     continue
-                chunks = chunker.chunk(doc)
-                all_chunks.extend(chunks)
+                for chunk in chunker.chunk(doc):
+                    chunk.index = len(all_chunks)
+                    all_chunks.append(chunk)
                 total_pages = max(total_pages, doc.metadata.get("total_pages", 0))
 
             embedded = _embed_chunks(all_chunks)

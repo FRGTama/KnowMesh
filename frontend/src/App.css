@@ -109,3 +109,63 @@ button:disabled {
   margin: 0;
   line-height: 1;
 }
+
+.doc-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.doc-block {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.doc-block:hover {
+  background: #f0f4ff;
+}
+
+.doc-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-actions {
+  display: none;
+  gap: 0.25rem;
+  margin-left: 1rem;
+}
+
+.doc-block:hover .doc-actions {
+  display: flex;
+}
+
+.doc-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem 0.5rem;
+  margin: 0;
+}
+
+.doc-actions button:hover {
+  background: #e0e7ff;
+  border-radius: 4px;
+}
+
+.doc-expanded {
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  color: #555;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+.doc-expanded p {
+  margin: 0.25rem 0;
+}

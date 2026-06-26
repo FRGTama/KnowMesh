@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -108,6 +109,19 @@ async def delete_document(document_id: str):
         return JSONResponse({"error": "Document not found"}, status_code=404)
     chunk_count = _pipeline.delete_document(document_id)
     return JSONResponse({"deleted": True, "document_id": document_id, "chunk_count": chunk_count})
+
+
+class _PatchDoc(BaseModel):
+    tags: list[str]
+
+
+@app.patch("/documents/{document_id}")
+async def patch_document(document_id: str, body: _PatchDoc):
+    doc = _pipeline.get_document(document_id)
+    if doc is None:
+        return JSONResponse({"error": "Document not found"}, status_code=404)
+    _registry.update_document(document_id, tags=body.tags)
+    return JSONResponse({"ok": True, "tags": body.tags})
 
 
 if FRONTEND_DIST.exists():

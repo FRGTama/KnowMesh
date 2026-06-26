@@ -2,6 +2,15 @@
 
 A FastAPI + React Retrieval-Augmented Generation system for students. Upload study materials (PDF, DOCX, PPTX, images, plain text), chunk & embed them, then ask questions against your personal knowledge base with your choice of LLM provider.
 
+## TODO
+Backend:
+- [] Chunk storing id should change to using UUID to be unique
+- [] Task queue for async jobs
+- [] Duplication checking, updating old document to newer
+- [] keyword + semantic search (hybrid search)
+Frontend:
+- [] Document list, actions: delete, view, move(future)
+
 ## Quick Start
 
 ```bash
