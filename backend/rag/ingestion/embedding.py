@@ -8,7 +8,7 @@ from backend.llm import embed as _embed
 class EmbeddedChunk(Chunk):
     vector: list[float] = field(default_factory=list)
 
-
+# TODO: embed references
 def embed_chunks(chunks: list[Chunk]) -> list[EmbeddedChunk]:
     if not chunks:
         return []

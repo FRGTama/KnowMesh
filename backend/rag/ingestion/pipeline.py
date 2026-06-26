@@ -24,7 +24,7 @@ def process_file(path: str, strategy: str = "recursive") -> None:
         embedded = _embed_chunks(chunks)
         store.upsert(embedded)
 
-
+# TODO: implement re-ranker later
 def process_query(query: str, top_k: int = 5) -> list[dict]:
     query_vector = _embed_query(query)
     return _get_store().search(query_vector, top_k)
@@ -39,7 +39,6 @@ def clear_store() -> int:
     count = _get_store().clear()
     _vector_store = None
     return count
-
 
 def _resolve_chunker(strategy: str) -> BaseChunker:
     if strategy == "semantic":

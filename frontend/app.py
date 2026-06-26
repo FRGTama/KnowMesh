@@ -4,9 +4,9 @@ import tempfile
 import uuid
 import uvicorn
 
-from fastapi import FastAPI, UploadFile, File, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -15,12 +15,9 @@ from backend.rag.agents.retrieval_agent import ask as _ask
 
 
 app = FastAPI(title="KnowMesh")
-templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request, answer: str = ""):
-    return templates.TemplateResponse(request, "index.html", {"answer": answer})
+FRONTEND_DIST = Path(__file__).parent / "dist"
 
 
 @app.post("/upload")
@@ -33,13 +30,13 @@ async def upload(file: UploadFile = File(...), strategy: str = Form("recursive")
         _ingest(str(tmp_path), strategy)
     finally:
         tmp_path.unlink(missing_ok=True)
-    return RedirectResponse(url="/", status_code=303)
+    return JSONResponse({"ok": True, "filename": file.filename})
 
 
 @app.post("/query")
-async def query(request: Request, query: str = Form(...), provider: str = Form("openai")):
-    answer = _ask(query, provider=provider)
-    return templates.TemplateResponse(request, "index.html", {"answer": answer})
+async def query(query: str = Form(...), provider: str = Form("openai"), model: str = Form("gpt4.0")):
+    answer = _ask(query, provider=provider, model=model)
+    return JSONResponse({"answer": answer})
 
 
 @app.get("/collection-info")
@@ -52,5 +49,10 @@ async def clear():
     count = clear_store()
     return JSONResponse({"cleared": True, "count": count})
 
+
+if FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
+
+
 if __name__ == "__main__":
-    uvicorn.run(app="frontend.app:app",host="127.0.0.1",port=8000,reload=True)
+    uvicorn.run(app="frontend.app:app", host="127.0.0.1", port=8000, reload=True)

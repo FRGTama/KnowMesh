@@ -8,12 +8,13 @@ _embedding_model = None
 _openai_client = None
 _deepseek_client = None
 
+EMBED_MODEL="all-MiniLM-L6-v2"
 
 def _get_model():
     global _embedding_model
     if _embedding_model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+        _embedding_model = SentenceTransformer(EMBED_MODEL)
+    return _embedding_model
 
 
 def embed(text: str) -> list[float]:
@@ -40,8 +41,16 @@ def _get_deepseek_client():
         )
     return _deepseek_client
 
+def _get_llm_client(provider: str):
+    # TODO: abstract the llm client selection procedure, maybe abstract to an Object Client() +provider +model
+    if provider == "deepseek":
+        client = _get_deepseek_client()
+    else:
+        client = _get_openai_client()
+    return client
 
-def generate_response(contexts: list[str], query: str, provider: str = "openai") -> str:
+
+def generate_response(contexts: list[str], query: str, provider: str = "openai", model: str = "gpt4.0") -> str:
     if not contexts:
         return "No relevant information found in the provided materials."
     if provider == "none":
@@ -61,12 +70,7 @@ def generate_response(contexts: list[str], query: str, provider: str = "openai")
     context_block = "\n\n".join(contexts)
     user_prompt = f"Context materials:\n{context_block}\n\nQuestion: {query}"
 
-    if provider == "deepseek":
-        client = _get_deepseek_client()
-        model = "deepseek-v4-flash"
-    else:
-        client = _get_openai_client()
-        model = "gpt-4o"
+    client = _get_llm_client(provider)
 
     response = client.chat.completions.create(
         model=model,

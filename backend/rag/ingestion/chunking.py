@@ -59,6 +59,7 @@ class RecursiveChunker(BaseChunker):
 class SemanticChunker(BaseChunker):
     def __init__(self, window_size: int = 512):
         self.window_size = window_size
+        # TODO: asbtract the fallback strategy selection
         self._fallback = RecursiveChunker(window_size=window_size, overlap=0)
 
     def chunk(self, document: Document) -> list[Chunk]:
@@ -72,7 +73,8 @@ class SemanticChunker(BaseChunker):
             if self._exceeds_window(para):
                 fallback_doc = Document(text=para, metadata=document.metadata)
                 for chunk in self._fallback.chunk(fallback_doc):
-                    chunk.strategy = "semantic"
+                    chunk.index = index
+                    chunk.strategy = "recursive_fallback_semantic"
                     chunks.append(chunk)
                     index += 1
             else:
