@@ -1,12 +1,22 @@
+from pathlib import Path
+
 import chromadb
 from chromadb.config import Settings
 
 from backend.rag.ingestion.embedding import EmbeddedChunk
 
 
+def _db_path() -> str:
+    here = Path(__file__).resolve().parent.parent.parent.parent
+    return str(here / "data" / "chroma")
+
+
 class VectorStore:
     def __init__(self, collection_name: str = "student_rag"):
-        self._client = chromadb.Client(Settings(anonymized_telemetry=False))
+        path = _db_path()
+        Path(path).mkdir(parents=True, exist_ok=True)
+        self._client = chromadb.PersistentClient(path=path, settings=Settings(anonymized_telemetry=False))
+        self._collection_name = collection_name
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
             metadata={"hnsw:space": "cosine"},
@@ -50,6 +60,18 @@ class VectorStore:
                 "distance": results["distances"][0][i] if results.get("distances") else None,
             })
         return formatted
+
+    def count(self) -> int:
+        return self._collection.count()
+
+    def clear(self) -> int:
+        count = self._collection.count()
+        self._client.delete_collection(self._collection_name)
+        self._collection = self._client.create_collection(
+            name=self._collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        return count
 
     def _existing_ids(self, doc_ids: set[str]) -> set[str]:
         if not doc_ids:

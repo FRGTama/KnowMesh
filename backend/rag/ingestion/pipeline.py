@@ -30,6 +30,17 @@ def process_query(query: str, top_k: int = 5) -> list[dict]:
     return _get_store().search(query_vector, top_k)
 
 
+def count_store() -> int:
+    return _get_store().count()
+
+
+def clear_store() -> int:
+    global _vector_store
+    count = _get_store().clear()
+    _vector_store = None
+    return count
+
+
 def _resolve_chunker(strategy: str) -> BaseChunker:
     if strategy == "semantic":
         return SemanticChunker()
