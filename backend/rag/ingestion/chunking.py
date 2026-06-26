@@ -5,7 +5,6 @@ import tiktoken
 
 from backend.rag.ingestion.document_loader import Document
 
-
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
@@ -36,6 +35,8 @@ class RecursiveChunker(BaseChunker):
         if not tokens:
             return []
 
+        doc_id = document.metadata.get("document_id", document.metadata.get("filename", "unknown"))
+
         chunks = []
         start = 0
         index = 0
@@ -44,7 +45,7 @@ class RecursiveChunker(BaseChunker):
             chunk_text = _ENCODING.decode(tokens[start:end])
             chunks.append(Chunk(
                 text=chunk_text,
-                doc_id=document.metadata.get("filename", "unknown"),
+                doc_id=doc_id,
                 index=index,
                 strategy="recursive",
                 metadata={**document.metadata},
@@ -59,13 +60,14 @@ class RecursiveChunker(BaseChunker):
 class SemanticChunker(BaseChunker):
     def __init__(self, window_size: int = 512):
         self.window_size = window_size
-        # TODO: asbtract the fallback strategy selection
         self._fallback = RecursiveChunker(window_size=window_size, overlap=0)
 
     def chunk(self, document: Document) -> list[Chunk]:
         paragraphs = [p.strip() for p in document.text.split("\n\n") if p.strip()]
         if not paragraphs:
             return []
+
+        doc_id = document.metadata.get("document_id", document.metadata.get("filename", "unknown"))
 
         chunks = []
         index = 0
@@ -80,7 +82,7 @@ class SemanticChunker(BaseChunker):
             else:
                 chunks.append(Chunk(
                     text=para,
-                    doc_id=document.metadata.get("filename", "unknown"),
+                    doc_id=doc_id,
                     index=index,
                     strategy="semantic",
                     metadata={**document.metadata},

@@ -35,21 +35,36 @@ class VectorStore:
             documents=[c.text for c in to_add],
             metadatas=[
                 {
-                    "doc_id": c.doc_id,
+                    "document_id": c.metadata.get("document_id", ""),
+                    "chunk_id": f"{c.doc_id}_{c.index}",
                     "index": c.index,
+                    "page": c.metadata.get("page", 0),
+                    "total_pages": c.metadata.get("total_pages", 0),
                     "strategy": c.strategy,
-                    **c.metadata,
+                    "filename": c.metadata.get("filename", ""),
+                    "file_type": c.metadata.get("file_type", ""),
                 }
                 for c in to_add
             ],
         )
 
-    def search(self, vector: list[float], top_k: int = 5) -> list[dict]:
+    def search(
+        self,
+        vector: list[float],
+        top_k: int = 5,
+        document_ids: list[str] | None = None,
+    ) -> list[dict]:
         if not vector or all(v == 0.0 for v in vector):
             return []
+
+        where = None
+        if document_ids:
+            where = {"document_id": {"$in": document_ids}}
+
         results = self._collection.query(
             query_embeddings=[vector],
             n_results=top_k,
+            where=where,
         )
         formatted = []
         for i in range(len(results["ids"][0])):
@@ -73,12 +88,23 @@ class VectorStore:
         )
         return count
 
+    def delete_by_document_id(self, document_id: str) -> int:
+        existing = self._collection.get(
+            where={"document_id": document_id},
+            include=[],
+        )
+        ids = existing["ids"]
+        if not ids:
+            return 0
+        self._collection.delete(ids=ids)
+        return len(ids)
+
     def _existing_ids(self, doc_ids: set[str]) -> set[str]:
         if not doc_ids:
             return set()
         try:
             result = self._collection.get(
-                where={"doc_id": {"$in": list(doc_ids)}},
+                where={"document_id": {"$in": list(doc_ids)}},
                 include=[],
             )
             return set(result["ids"])

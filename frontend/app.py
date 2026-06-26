@@ -1,23 +1,29 @@
 import sys
-from pathlib import Path
 import tempfile
 import uuid
-import uvicorn
+from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import JSONResponse, FileResponse
+import uvicorn
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.rag.ingestion.pipeline import process_file as _ingest, count_store, clear_store
 from backend.rag.agents.retrieval_agent import ask as _ask
-
+from backend.rag.ingestion.pipeline import Pipeline
+from backend.rag.registry import FileStorage, SqliteRegistry
 
 app = FastAPI(title="KnowMesh")
-
-
 FRONTEND_DIST = Path(__file__).parent / "dist"
+
+
+REGISTRY_DB = str(Path(__file__).resolve().parent.parent / "data" / "registry.db")
+STORAGE_DIR = str(Path(__file__).resolve().parent.parent / "data" / "storage")
+
+_registry = SqliteRegistry(REGISTRY_DB)
+_storage = FileStorage(STORAGE_DIR)
+_pipeline = Pipeline(registry=_registry, storage=_storage)
 
 
 @app.post("/upload")
@@ -27,27 +33,81 @@ async def upload(file: UploadFile = File(...), strategy: str = Form("recursive")
     content = await file.read()
     tmp_path.write_bytes(content)
     try:
-        _ingest(str(tmp_path), strategy)
+        document_id = _pipeline.process_file(str(tmp_path), strategy)
     finally:
         tmp_path.unlink(missing_ok=True)
-    return JSONResponse({"ok": True, "filename": file.filename})
+    return JSONResponse({"ok": True, "filename": file.filename, "document_id": document_id})
 
 
 @app.post("/query")
-async def query(query: str = Form(...), provider: str = Form("openai"), model: str = Form("gpt4.0")):
-    answer = _ask(query, provider=provider, model=model)
+async def query(
+    query: str = Form(...),
+    provider: str = Form("openai"),
+    model: str = Form("gpt4.0"),
+    document_ids: str = Form(""),
+):
+    ids = [d.strip() for d in document_ids.split(",") if d.strip()] or None
+    answer = _ask(_pipeline, query, provider=provider, model=model, document_ids=ids)
     return JSONResponse({"answer": answer})
 
 
 @app.get("/collection-info")
 async def collection_info():
-    return JSONResponse({"name": "student_rag", "count": count_store()})
+    return JSONResponse({"name": "student_rag", "count": _pipeline.count_store()})
 
 
 @app.post("/clear")
 async def clear():
-    count = clear_store()
+    count = _pipeline.clear_store()
     return JSONResponse({"cleared": True, "count": count})
+
+
+@app.get("/documents")
+async def list_documents():
+    docs = _pipeline.list_documents()
+    return JSONResponse([
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "file_type": d.file_type,
+            "status": d.status,
+            "chunk_count": d.chunk_count,
+            "total_pages": d.total_pages,
+            "tags": d.tags,
+            "created_at": d.created_at,
+        }
+        for d in docs
+    ])
+
+
+@app.get("/documents/{document_id}")
+async def get_document(document_id: str):
+    doc = _pipeline.get_document(document_id)
+    if doc is None:
+        return JSONResponse({"error": "Document not found"}, status_code=404)
+    return JSONResponse({
+        "id": doc.id,
+        "filename": doc.filename,
+        "source_path": doc.source_path,
+        "file_type": doc.file_type,
+        "status": doc.status,
+        "chunk_count": doc.chunk_count,
+        "total_pages": doc.total_pages,
+        "strategy": doc.strategy,
+        "tags": doc.tags,
+        "error": doc.error,
+        "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
+    })
+
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str):
+    doc = _pipeline.get_document(document_id)
+    if doc is None:
+        return JSONResponse({"error": "Document not found"}, status_code=404)
+    chunk_count = _pipeline.delete_document(document_id)
+    return JSONResponse({"deleted": True, "document_id": document_id, "chunk_count": chunk_count})
 
 
 if FRONTEND_DIST.exists():

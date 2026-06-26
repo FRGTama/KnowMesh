@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
-from backend.rag.ingestion.chunking import Chunk
 from backend.llm import embed as _embed
+from backend.rag.ingestion.chunking import Chunk
 
 
 @dataclass

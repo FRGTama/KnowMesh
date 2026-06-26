@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from liteparse import LiteParse
 
 
@@ -74,11 +75,20 @@ def _create_default_registry() -> LoaderRegistry:
 _default_registry = _create_default_registry()
 
 
-def load(path: str, registry: LoaderRegistry | None = None) -> list[Document]:
+def load(
+    path: str,
+    document_id: str = "",
+    registry: LoaderRegistry | None = None,
+) -> list[Document]:
     r = registry or _default_registry
     path_obj = Path(path)
     ext = path_obj.suffix.lower()
-    base_metadata = {"filename": path_obj.name, "path": str(path_obj.absolute())}
+    base_metadata = {
+        "filename": path_obj.name,
+        "path": str(path_obj.absolute()),
+        "file_type": ext,
+        "document_id": document_id,
+    }
 
     if not path_obj.exists():
         return [Document(text="", metadata={**base_metadata, "error": "File not found"})]
