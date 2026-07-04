@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
+from uuid import UUID
 
 import tiktoken
 
@@ -8,13 +10,23 @@ from backend.rag.ingestion.document_loader import Document
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
+def _resolve_doc_id(metadata: dict[str, Any]) -> UUID:
+    raw = metadata.get("document_id", "")
+    if not raw:
+        return UUID("00000000-0000-0000-0000-000000000000")
+    try:
+        return UUID(raw)
+    except ValueError:
+        return UUID("00000000-0000-0000-0000-000000000000")
+
+
 @dataclass
 class Chunk:
     text: str
-    doc_id: str
+    document_id: UUID
     index: int
     strategy: str
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseChunker(ABC):
@@ -35,7 +47,7 @@ class RecursiveChunker(BaseChunker):
         if not tokens:
             return []
 
-        doc_id = document.metadata.get("document_id", document.metadata.get("filename", "unknown"))
+        doc_id = _resolve_doc_id(document.metadata)
 
         chunks = []
         start = 0
@@ -45,7 +57,7 @@ class RecursiveChunker(BaseChunker):
             chunk_text = _ENCODING.decode(tokens[start:end])
             chunks.append(Chunk(
                 text=chunk_text,
-                doc_id=doc_id,
+                document_id=doc_id,
                 index=index,
                 strategy="recursive",
                 metadata={**document.metadata},
@@ -67,7 +79,7 @@ class SemanticChunker(BaseChunker):
         if not paragraphs:
             return []
 
-        doc_id = document.metadata.get("document_id", document.metadata.get("filename", "unknown"))
+        doc_id = _resolve_doc_id(document.metadata)
 
         chunks = []
         index = 0
@@ -82,7 +94,7 @@ class SemanticChunker(BaseChunker):
             else:
                 chunks.append(Chunk(
                     text=para,
-                    doc_id=doc_id,
+                    document_id=doc_id,
                     index=index,
                     strategy="semantic",
                     metadata={**document.metadata},

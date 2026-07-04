@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: knowmesh
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  api:
+    depends_on:
+      - redis
+      - postgres
+      - minio
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/knowmesh
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: knowmesh
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_REGION: us-east-1
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    depends_on:
+      - redis
+      - postgres
+      - minio
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/knowmesh
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: knowmesh
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_REGION: us-east-1
+    volumes:
+      - ./backend:/app/backend
+
+  nginx:
+    profiles: ["prod"]
+
+volumes:
+  postgres-data:
+  minio-data:

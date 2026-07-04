@@ -8,3 +8,5 @@ node_modules
 dist/
 .ruff_cache
 .pytest_cache
+.mypy_cache
+frontend/src/routeTree.gen.ts

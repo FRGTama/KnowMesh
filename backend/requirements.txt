@@ -1,0 +1,17 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0
+pgvector>=0.3.0
+alembic>=1.13.0
+redis[hiredis]>=5.0.0
+rq>=1.16.0
+openai>=1.30.0
+voyageai>=0.2.0
+aiobotocore>=2.0.0
+tiktoken>=0.7.0
+liteparse>=2.0.0
+structlog>=24.1.0

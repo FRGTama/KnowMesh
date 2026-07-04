@@ -1,5 +1,8 @@
-"""Placeholder for future temporal knowledge graph (e.g. Graphiti-style).
+"""Graph layer for entity/relation storage and graph-assisted retrieval.
 
-This package will host entity extraction, relationship resolution,
-and temporal graph storage backed by Neo4j / FalkorDB / Neptune.
+Backed by PostgreSQL (entities, relations, chunk_entities tables).
 """
+
+from backend.rag.graph.service import GraphService
+
+__all__ = ["GraphService"]

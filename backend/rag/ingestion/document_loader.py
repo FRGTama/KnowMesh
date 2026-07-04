@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from liteparse import LiteParse
 
@@ -8,18 +9,18 @@ from liteparse import LiteParse
 @dataclass
 class Document:
     text: str
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class DocumentLoader(ABC):
     @abstractmethod
-    def load(self, path: Path, base_metadata: dict) -> list[Document]:
+    def load(self, path: Path, base_metadata: dict[str, Any]) -> list[Document]:
         ...
 
 
 class TextLoader(DocumentLoader):
-    def load(self, path: Path, base_metadata: dict) -> list[Document]:
-        with open(path, "r", encoding="utf-8") as f:
+    def load(self, path: Path, base_metadata: dict[str, Any]) -> list[Document]:
+        with open(path, encoding="utf-8") as f:
             text = f.read()
         if not text:
             return [Document(text="", metadata={**base_metadata, "error": "Empty file"})]
@@ -27,7 +28,7 @@ class TextLoader(DocumentLoader):
 
 
 class LiteParseLoader(DocumentLoader):
-    def load(self, path: Path, base_metadata: dict) -> list[Document]:
+    def load(self, path: Path, base_metadata: dict[str, Any]) -> list[Document]:
         parser = LiteParse(output_format="text")
         result = parser.parse(str(path))
         documents = []
@@ -48,10 +49,10 @@ class LiteParseLoader(DocumentLoader):
 
 
 class LoaderRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._loaders: dict[str, DocumentLoader] = {}
 
-    def register(self, extension: str, loader: DocumentLoader):
+    def register(self, extension: str, loader: DocumentLoader) -> None:
         self._loaders[extension.lower()] = loader
 
     def get_loader(self, extension: str) -> DocumentLoader | None:

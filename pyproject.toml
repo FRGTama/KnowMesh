@@ -3,9 +3,30 @@ line-length = 120
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["SIM"]
+"backend/app/api/*.py" = ["B008"]
+"backend/app/dependencies.py" = ["B008"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "liteparse.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
