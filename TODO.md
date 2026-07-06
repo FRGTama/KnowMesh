@@ -2,21 +2,21 @@
 
 ## Phase 1 — Ingestion Pipeline
 
-- [ ] **1.1** Add `UploadResponse` schema to `backend/schemas/document.py`
-- [ ] **1.1** Add `user_id: UUID | None = None` to `DocumentCreate`
-- [ ] **1.2** Create `backend/rag/ingestion/pipeline.py` with `IngestionPipeline` class
-- [ ] **1.2** Implement `process()`, `_download()`, `_parse()`, `_chunk()`, `_embed_and_store()`, `_update_status()`
-- [ ] **1.3** Create `backend/workers/jobs.py` with `process_document()` function
-- [ ] **1.3** Bridge async pipeline from sync RQ worker via `asyncio.run()`
-- [ ] **1.4** Update `backend/workers/worker.py` to import `backend.workers.jobs`
-- [ ] **1.5** Add `POST /documents/upload` handler to `backend/app/api/rag.py`
-- [ ] **1.5** Implement file validation (extension, size), SHA-256 hash, dedup check
-- [ ] **1.5** Wire S3 upload + Document creation + RQ enqueue
-- [ ] **1.6** Add `s3_key` column to `backend/app/models/document.py`
-- [ ] **1.6** Create migration `backend/migrations/versions/0003_document_s3_key.py`
-- [ ] **1.7** Add `get_ingestion_pipeline()` to `backend/app/dependencies.py`
-- [ ] **1.8** Create `tests/rag/test_pipeline.py` (4 tests: happy path, failure, batching, empty)
-- [ ] **1.8** Create `tests/api/test_upload.py` (4 tests: success, bad ext, size limit, dedup)
+- [x] **1.1** Add `UploadResponse` schema to `backend/schemas/document.py`
+- [ ] **1.1** Add `user_id: UUID | None = None` to `DocumentCreate` *(deferred to Phase 4)*
+- [x] **1.2** Create `backend/rag/ingestion/pipeline.py` with `IngestionPipeline` class
+- [x] **1.2** Implement `process()`, `_download()`, `_parse()`, `_chunk()`, `_embed_and_store()`, `_update_status()`
+- [x] **1.3** Create `backend/workers/jobs.py` with `process_document()` function
+- [x] **1.3** Bridge async pipeline from sync RQ worker via `asyncio.run()`
+- [x] **1.4** Update `backend/workers/worker.py` to import `backend.workers.jobs`
+- [x] **1.5** Add `POST /documents/upload` handler to `backend/app/api/rag.py`
+- [x] **1.5** Implement file validation (extension, size), SHA-256 hash, dedup check
+- [x] **1.5** Wire S3 upload + Document creation + RQ enqueue
+- [x] **1.6** Add `s3_key` column to `backend/app/models/document.py`
+- [x] **1.6** Create migration `backend/migrations/versions/0003_document_s3_key.py`
+- [x] **1.7** Add `get_ingestion_pipeline()` to `backend/app/dependencies.py`
+- [x] **1.8** Create `tests/rag/test_pipeline.py` (4 tests: happy path, failure, batching, empty)
+- [x] **1.8** Create `tests/api/test_upload.py` (4 tests: success, bad ext, size limit, dedup)
 
 ## Phase 2 — Entity Extraction
 
@@ -49,38 +49,36 @@
 
 ## Phase 4 — Auth & User Scoping
 
-- [ ] **4.1** Add `bcrypt>=4.1.0` and `PyJWT>=2.8.0` to `backend/requirements.txt`
-- [ ] **4.2** Create `backend/app/models/user.py` with `User` model
+- [ ] **4.1** Add `authlib>=1.3.0` to `backend/requirements.txt`
+- [ ] **4.2** Create `backend/app/models/user.py` with `User` model (google_id, display_name, avatar_url)
 - [ ] **4.2** Add `User` re-export to `backend/app/models/__init__.py`
 - [ ] **4.3** Create migration `0004_users_and_ownership.py` (users table + user_id FKs on all resource tables)
 - [ ] **4.4** Add `user_id` column to `Document`, `Chunk`, `Entity`, `Relation` ORM models
-- [ ] **4.5** Create `backend/app/core/auth.py` with `hash_password()`, `verify_password()`, `create_access_token()`, `create_refresh_token()`, `decode_token()`
-- [ ] **4.5** Add `jwt_secret`, `jwt_access_token_expire_minutes`, `jwt_refresh_token_expire_days` to `Settings`
-- [ ] **4.5** Add `JWT_SECRET` to `.env.example`
-- [ ] **4.6** Add `get_current_user()` dependency to `backend/app/dependencies.py`
+- [ ] **4.5** Create `backend/app/core/oauth.py` with OAuth client, Google redirect, callback handler, session management
+- [ ] **4.5** Add `google_client_id`, `google_client_secret`, `oauth_redirect_url`, `session_secret` to `Settings`
+- [ ] **4.6** Add `get_current_user()` dependency (session cookie based) to `backend/app/dependencies.py`
 - [ ] **4.7** Add `user_id` filter to all methods in `DocumentRepository`
 - [ ] **4.7** Add `user_id` filter to all methods in `ChunkRepository`
 - [ ] **4.7** Add `user_id` filter to all methods in `EntityRepository`
 - [ ] **4.7** Add `user_id` filter to all methods in `RelationRepository`
-- [ ] **4.8** Create `backend/schemas/auth.py` (RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserResponse)
-- [ ] **4.8** Create `backend/app/api/auth.py` with register, login, refresh, me endpoints
+- [ ] **4.8** Create `backend/schemas/auth.py` (LoginResponse, UserResponse)
+- [ ] **4.8** Create `backend/app/api/auth.py` with Google login, callback, logout, me endpoints
 - [ ] **4.8** Mount auth router in `backend/app/api/router.py`
 - [ ] **4.9** Add `get_current_user` dependency to all handlers in `backend/app/api/rag.py`
 - [ ] **4.9** Add `user_id` param to `RetrievalService.query()` and `_search()`
 - [ ] **4.9** Add `user_id` param to `GraphService.search()`, `get_document_entities()`, `get_document_graph()`
 - [ ] **4.10** Update `IngestionPipeline.process()` to read and propagate `document.user_id`
-- [ ] **4.11** Create `tests/core/test_auth.py` (8 tests)
-- [ ] **4.11** Create `tests/api/test_auth.py` (10 tests)
+- [ ] **4.11** Create `tests/core/test_oauth.py` (6 tests: redirect URL, new user, existing user, session round-trip, expiry, tampered)
+- [ ] **4.11** Create `tests/api/test_auth.py` (6 tests: login redirect, callback success, me authed, me unauth, logout, CORS)
 - [ ] **4.11** Create `tests/repositories/test_user_scoping.py` (6 tests)
 - [ ] **4.11** Update existing tests: `test_rag.py`, `test_providers.py`, `conftest.py`, `test_retrieval.py`
 
 ## Phase 5 — Frontend
 
-- [ ] **5.1** Create `frontend/src/api/auth.ts` with register, login, refresh, getMe, logout, token helpers
-- [ ] **5.1** Add request/response interceptors to `frontend/src/api/client.ts`
-- [ ] **5.1** Create `frontend/src/routes/login.tsx`
-- [ ] **5.1** Create `frontend/src/routes/register.tsx`
-- [ ] **5.1** Add `beforeLoad` auth guard to `frontend/src/routes/__root.tsx`
+- [ ] **5.1** Create `frontend/src/api/auth.ts` with getGoogleLoginUrl, getMe, logout (no token storage — session cookie is httponly)
+- [ ] **5.1** Add 401 response interceptor to `frontend/src/api/client.ts` (redirect to /login)
+- [ ] **5.1** Create `frontend/src/routes/login.tsx` with "Sign in with Google" button
+- [ ] **5.1** Add `beforeLoad` auth guard to `frontend/src/routes/__root.tsx` (call getMe, redirect on 401)
 - [ ] **5.2** Create `frontend/src/api/documents.ts` with all document API functions
 - [ ] **5.2** Create `frontend/src/routes/documents/upload.tsx` with drag-and-drop + progress
 - [ ] **5.3** Create `frontend/src/routes/documents/index.tsx` with paginated table + status polling
@@ -111,12 +109,26 @@
 - [ ] **6.7** Create `tests/core/test_middleware.py` (request logging, request_id, metrics)
 - [ ] **6.7** Create `tests/core/test_error_handlers.py` (exception to status code mapping)
 
-## Phase 7 — CI/CD & Test Expansion
+## Phase 7 — Deployment (AWS EC2 + Terraform)
 
-- [ ] **7.1** Create `.github/workflows/ci.yml` with lint, typecheck, test, docker-build jobs
-- [ ] **7.2** Add `[tool.coverage.run]` and `[tool.coverage.report]` to `pyproject.toml` (fail_under=80)
-- [ ] **7.3** Verify all 9 new test files exist from phases 1-6
-- [ ] **7.4** Update `tests/api/test_rag.py` with `get_current_user` override
-- [ ] **7.4** Update `tests/api/test_providers.py` with auth override
-- [ ] **7.4** Update `tests/repositories/conftest.py` with `sample_user` fixture + `user_id` on `sample_document`
-- [ ] **7.4** Update `tests/rag/test_retrieval.py` with `user_id` params
+- [ ] **7.1** Create `terraform/main.tf`, `ec2.tf`, `s3.tf`, `iam.tf`, `variables.tf`, `outputs.tf`
+- [ ] **7.1** Create `terraform/user-data.sh` (Docker + Compose + cron + EBS mount)
+- [ ] **7.2** Create `docker-compose.prod.yml` (postgres, redis, api, worker, nginx, prometheus, grafana)
+- [ ] **7.2** Create `configs/prometheus.yml`
+- [ ] **7.2** Create `configs/grafana/provisioning/datasources/prometheus.yaml`
+- [ ] **7.2** Create `configs/nginx/cloudflare-origin.conf`
+- [ ] **7.3** Create `scripts/backup-db.sh` and `scripts/restore-db.sh`
+- [ ] **7.4** Create `scripts/deploy.sh`
+- [ ] **7.5** Create `configs/grafana/dashboards/` (4 JSON dashboards: API perf, system, postgres, queue)
+- [ ] **7.6** Create `docs/runbook.md`
+- [ ] **7.7** Validate: `terraform plan`, `docker compose config`, manual deploy test
+
+## Phase 8 — CI/CD & Test Expansion
+
+- [ ] **8.1** Create `.github/workflows/ci.yml` with lint, typecheck, test, docker-build jobs
+- [ ] **8.2** Add `[tool.coverage.run]` and `[tool.coverage.report]` to `pyproject.toml` (fail_under=80)
+- [ ] **8.3** Verify all new test files exist from phases 1-7
+- [ ] **8.4** Update `tests/api/test_rag.py` with `get_current_user` override
+- [ ] **8.4** Update `tests/api/test_providers.py` with auth override
+- [ ] **8.4** Update `tests/repositories/conftest.py` with `sample_user` fixture + `user_id` on `sample_document`
+- [ ] **8.4** Update `tests/rag/test_retrieval.py` with `user_id` params

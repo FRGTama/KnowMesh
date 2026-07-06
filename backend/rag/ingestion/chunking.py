@@ -71,9 +71,9 @@ class RecursiveChunker(BaseChunker):
 
 
 class SemanticChunker(BaseChunker):
-    def __init__(self, window_size: int = 512):
+    def __init__(self, window_size: int = 512, overlap: int = 128):
         self.window_size = window_size
-        self._fallback = RecursiveChunker(window_size=window_size, overlap=0)
+        self._fallback = RecursiveChunker(window_size=window_size, overlap=overlap)
 
     def chunk(self, document: Document) -> list[Chunk]:
         paragraphs = [p.strip() for p in document.text.split("\n\n") if p.strip()]

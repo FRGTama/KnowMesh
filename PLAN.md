@@ -7,12 +7,13 @@
 | **1** | Ingestion Pipeline | Upload → parse → chunk → embed → store (end-to-end data flow) |
 | **2** | Entity Extraction | LLM-based NER populating the graph layer |
 | **3** | Query Path Hardening | Concurrent search, SSE streaming, citation quality |
-| **4** | Auth & User Scoping | JWT auth, per-user data isolation |
+| **4** | Auth & User Scoping | Google OAuth, per-user data isolation |
 | **5** | Frontend | Upload UI, document list, query interface, graph visualization |
 | **6** | Observability & Error Handling | structlog, Prometheus metrics, global exception handlers |
-| **7** | CI/CD & Test Expansion | GitHub Actions pipeline, coverage enforcement |
+| **7** | Deployment | AWS EC2 + Terraform + S3 + Cloudflare |
+| **8** | CI/CD & Test Expansion | GitHub Actions pipeline, coverage enforcement |
 
-**Dependency chain:** 1 → 2 → 3 → 4 → 5 → 6 → 7. Each phase depends on the previous being complete. Phase 4 (auth) could technically run in parallel with 2–3, but sequencing it after query hardening means the frontend (phase 5) connects to a fully functional, authenticated API.
+**Dependency chain:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8. Each phase depends on the previous being complete. Phase 4 (auth) could technically run in parallel with 2–3, but sequencing it after query hardening means the frontend (phase 5) connects to a fully functional, authenticated API.
 
 ---
 
@@ -591,15 +592,15 @@ async def query_stream(body: QueryRequest, service: RetrievalService = Depends(g
 
 ## Abstract Overview
 
-Add JWT-based authentication with email/password self-registration. Every resource becomes scoped to the authenticated user. This phase is foundational — the frontend (Phase 5) and observability (Phase 6) both assume auth exists.
+Add Google OAuth authentication. Every resource becomes scoped to the authenticated user. No password management — auth is delegated to Google. This phase is foundational — the frontend (Phase 5) and observability (Phase 6) both assume auth exists.
 
 ## Final Objective
 
-- Users register, login, receive JWT access (30 min) + refresh (7 day) token pairs
-- All API endpoints require valid JWT (except `/health`, `/auth/login`, `/auth/register`)
+- Users sign in via Google OAuth (no registration page needed)
+- A `users` table stores Google profile data (id, email, name, avatar)
+- All API endpoints require a valid session (except `/health`, `/auth/google/login`, `/auth/google/callback`)
 - Every document, chunk, entity, relation is owned by a user via `user_id` FK
 - Queries only search within the authenticated user's documents
-- Refresh token rotation for security
 
 ---
 
@@ -607,9 +608,9 @@ Add JWT-based authentication with email/password self-registration. Every resour
 
 **File:** `backend/requirements.txt`
 
-**Add:** `bcrypt>=4.1.0`, `PyJWT>=2.8.0`
+**Add:** `authlib>=1.3.0`
 
-**Why:** `bcrypt` for adaptive password hashing. `PyJWT` for stateless JWT creation/verification.
+**Why:** authlib is a mature, well-maintained OAuth library for Python. It handles the OAuth 2.0 code flow, token exchange, and userinfo retrieval with minimal code. No need for bcrypt or PyJWT — auth delegation means we don't store credentials.
 
 ---
 
@@ -619,7 +620,7 @@ Add JWT-based authentication with email/password self-registration. Every resour
 
 **New class:** `User(Base, TimestampMixin)`
 - Table: `users`
-- Columns: `id` (UUID PK), `email` (String 320, unique, indexed), `password_hash` (String 128), `is_active` (Boolean, default True)
+- Columns: `id` (UUID PK), `email` (String 320, unique, indexed), `display_name` (String 128), `google_id` (String 64, unique, indexed), `avatar_url` (String 512, nullable), `is_active` (Boolean, default True)
 
 **File:** `backend/app/models/__init__.py`
 
@@ -650,23 +651,31 @@ Add JWT-based authentication with email/password self-registration. Every resour
 
 ---
 
-## Step 4.5 — Auth core
+## Step 4.5 — OAuth core
 
-**File:** `backend/app/core/auth.py` (new)
+**File:** `backend/app/core/oauth.py` (new)
 
-| Function | Purpose |
+**Components:**
+
+| Component | Purpose |
 |---|---|
-| `hash_password(password: str) -> str` | `bcrypt.hashpw` + `gensalt` |
-| `verify_password(plain: str, hashed: str) -> bool` | `bcrypt.checkpw` |
-| `create_access_token(user_id: UUID, email: str, expires_minutes: int = 30) -> str` | JWT with `sub`, `email`, `exp`, `type: "access"` |
-| `create_refresh_token(user_id: UUID, expires_days: int = 7) -> str` | JWT with `sub`, `exp`, `type: "refresh"` |
-| `decode_token(token: str) -> dict` | `jwt.decode`, raises on invalid/expired |
+| `oauth = AuthlibOAuthClient()` | Configures Google OAuth 2.0 with client id, secret, redirect URI |
+| `async def get_google_redirect_url() -> str` | Returns the Google login URL with requested scopes (openid, email, profile) |
+| `async def handle_google_callback(code: str, state: str) -> dict` | Exchanges authorization code for token, fetches userinfo from Google |
+| `async def create_session(user: User) -> str` | Creates a signed session cookie (httponly, secure, samesite=lax) |
+| `async def get_session_user(session_token: str, db: AsyncSession) -> User \| None` | Verifies session cookie, looks up user by ID |
 
 **File:** `backend/app/config.py`
 
-**Add to `Settings`:** `jwt_secret: str = Field(..., alias="JWT_SECRET")`, `jwt_access_token_expire_minutes: int = 30`, `jwt_refresh_token_expire_days: int = 7`
+**Add to `Settings`:**
+- `google_client_id: str = Field("", alias="GOOGLE_CLIENT_ID")`
+- `google_client_secret: str = Field("", alias="GOOGLE_CLIENT_SECRET")`
+- `oauth_redirect_url: str = Field("http://localhost:8000/auth/google/callback", alias="OAUTH_REDIRECT_URL")`
+- `session_secret: str = Field("", alias="SESSION_SECRET")`
 
-**File:** `.env.example` — add `JWT_SECRET=change-me-to-a-random-64-char-string`
+**Session approach:** Stateless signed cookies using `itsdangerous` (or stdlib `hmac`). No Redis session store needed. The cookie contains `user_id` + expiry + HMAC signature. 24-hour session expiry.
+
+**Why no JWT:** JWTs were needed for email/password because you needed a bearer token for API auth. With Google OAuth + session cookies, the browser automatically sends the cookie with every request. No token management on the client side. The session cookie is httponly — inaccessible to JavaScript, preventing XSS token theft.
 
 ---
 
@@ -674,9 +683,9 @@ Add JWT-based authentication with email/password self-registration. Every resour
 
 **File:** `backend/app/dependencies.py`
 
-**New function:** `async get_current_user(authorization: str = Header(...), session: AsyncSession = Depends(get_session)) -> User`
+**New function:** `async get_current_user(request: Request, session: AsyncSession = Depends(get_session)) -> User`
 
-Extracts Bearer token → `decode_token()` → query `User` by ID → raise 401 if invalid/inactive.
+Extracts session cookie → `get_session_user()` → raises 401 if invalid/missing. Also sets `request.state.user = user` for downstream use (logging, audit).
 
 ---
 
@@ -697,20 +706,30 @@ Extracts Bearer token → `decode_token()` → query `User` by ID → raise 401 
 
 | Schema | Fields |
 |---|---|
-| `RegisterRequest` | `email: EmailStr`, `password: str` (min 8) |
-| `LoginRequest` | `email: EmailStr`, `password: str` |
-| `RefreshRequest` | `refresh_token: str` |
-| `TokenResponse` | `access_token: str`, `refresh_token: str`, `token_type: str = "bearer"` |
-| `UserResponse` | `id: UUID`, `email: str`, `created_at: datetime` |
+| `LoginResponse` | `login_url: str` — the Google OAuth redirect URL |
+| `UserResponse` | `id: UUID`, `email: str`, `display_name: str`, `avatar_url: str \| None`, `created_at: datetime` |
 
 **File:** `backend/app/api/auth.py` (new)
 
 | Method | Path | Handler |
 |---|---|---|
-| POST | `/auth/register` | Create user, hash password, return tokens |
-| POST | `/auth/login` | Verify credentials, return tokens |
-| POST | `/auth/refresh` | Validate refresh token, issue new pair |
-| GET | `/auth/me` | Return current user (requires `get_current_user`) |
+| GET | `/auth/google/login` | Returns `LoginResponse` with Google OAuth URL (or redirects directly) |
+| GET | `/auth/google/callback` | Exchanges code → fetches userinfo → upsert User → sets session cookie → redirects to frontend |
+| POST | `/auth/logout` | Clears session cookie |
+| GET | `/auth/me` | Returns current user (requires `get_current_user`) |
+
+**Upsert logic (callback):**
+```
+1. Exchange authorization code for access token
+2. Fetch userinfo from Google (https://www.googleapis.com/oauth2/v2/userinfo)
+3. Look up User by google_id
+4. If exists: update email/display_name/avatar_url (in case changed on Google)
+5. If not: create new User with google_id, email, display_name, avatar_url
+6. Create session cookie
+7. Redirect to frontend (with session cookie set)
+```
+
+**Why GET for login/callback:** OAuth flows use browser redirects. POST would break the redirect chain.
 
 **File:** `backend/app/api/router.py` — mount auth router.
 
@@ -746,9 +765,21 @@ No change needed — the job function already fetches the document (which now ha
 
 ## Step 4.11 — Tests
 
-**File:** `tests/core/test_auth.py` (new) — 8 tests covering hashing, token creation/verification, expiry, invalid signatures.
+**File:** `tests/core/test_oauth.py` (new) — 6 tests covering:
+- `test_google_redirect_url_contains_expected_params` (mock config, verify URL has client_id, redirect_uri, scope, response_type)
+- `test_callback_creates_new_user` (mock Google token exchange + userinfo, verify User created with google_id)
+- `test_callback_returns_existing_user` (mock same Google ID twice, verify no duplicate)
+- `test_session_create_and_verify` (create session cookie, verify round-trips correctly)
+- `test_session_expired` (session with past expiry returns None)
+- `test_session_tampered` (tampered cookie signature returns None)
 
-**File:** `tests/api/test_auth.py` (new) — 10 tests covering register, login, refresh, me, duplicate email, weak password, wrong password, invalid token.
+**File:** `tests/api/test_auth.py` (new) — 6 tests covering:
+- `test_login_redirect` (GET /auth/google/login returns URL)
+- `test_callback_success` (mock OAuth, verify redirect + set-cookie header)
+- `test_me_authenticated` (GET /auth/me with valid cookie returns user)
+- `test_me_unauthenticated` (no cookie returns 401)
+- `test_logout_clears_cookie` (POST /auth/logout clears session)
+- `test_cors_exempt_for_oauth_endpoints` (auth endpoints accessible without CORS issues)
 
 **File:** `tests/repositories/test_user_scoping.py` (new) — 6 tests verifying cross-user isolation for documents, chunks, entities.
 
@@ -764,7 +795,7 @@ The React shell has all infrastructure (router, query client, API client, Tailwi
 
 ## Final Objective
 
-- Login/register pages with form validation
+- Google OAuth sign-in (no registration page)
 - Document upload with drag-and-drop and progress tracking
 - Document list with status badges, pagination, delete
 - Query interface with streaming answer display and citation highlights
@@ -773,23 +804,23 @@ The React shell has all infrastructure (router, query client, API client, Tailwi
 
 ---
 
-## Step 5.1 — Auth pages and token management
+## Step 5.1 — Auth pages (Google OAuth)
 
 **File:** `frontend/src/api/auth.ts` (new)
 
-Exports: `register()`, `login()`, `refresh()`, `getMe()`, `logout()`, `getTokens()`, `setTokens()`, `clearTokens()`
+Exports: `getGoogleLoginUrl()` (returns the backend OAuth URL), `getMe()` (GET /auth/me), `logout()` (POST /auth/logout). No token management needed — session cookie is httponly and sent automatically by the browser.
 
 **File:** `frontend/src/api/client.ts`
 
-**Change:** Add Axios request interceptor (attach `Authorization: Bearer <token>`). Add response interceptor (catch 401, attempt refresh, redirect to `/login` on failure).
+**Change:** No Bearer token interceptor needed (session cookies are automatic). Optionally add a response interceptor that catches 401 and redirects to `/login`.
 
-**File:** `frontend/src/routes/login.tsx` (new) — email + password form, calls `login()`, stores tokens, redirects to `/`.
+**File:** `frontend/src/routes/login.tsx` (new) — "Sign in with Google" button. Clicking redirects to `GET /auth/google/login` (backend handles the OAuth redirect). No email/password form.
 
-**File:** `frontend/src/routes/register.tsx` (new) — email + password + confirm form, calls `register()`, stores tokens, redirects to `/`.
+**No `register.tsx`:** Google OAuth handles account creation. New users are auto-provisioned on first login via the callback's upsert logic.
 
 **File:** `frontend/src/routes/__root.tsx`
 
-**Change:** Add `beforeLoad` guard — check for token in storage, redirect to `/login` if absent (skip for `/login` and `/register` routes).
+**Change:** Add `beforeLoad` guard — call `getMe()`, redirect to `/login` on 401. No token storage to check — session cookie is managed by the browser.
 
 ---
 
@@ -976,11 +1007,150 @@ IngestionError (500), RateLimitError (429)
 
 ---
 
-# Phase 7 — CI/CD & Test Expansion
+# Phase 7 — Deployment (AWS EC2 + Terraform)
 
 ## Abstract Overview
 
-Add a GitHub Actions pipeline and expand test coverage to cover all new code from phases 1–6.
+Convert the local Docker development setup into a production deployment on a single AWS EC2 instance. Terraform provisions the infrastructure (EC2, S3, networking). Docker Compose runs the application stack. Cloudflare handles DNS and SSL termination. No app code changes — Phase 7 is pure infrastructure and operations tooling.
+
+## Final Objective
+
+- Terraform config provisions EC2 (t3.medium), S3 bucket, security group, IAM roles from scratch
+- `docker-compose.prod.yml` runs the full stack: Postgres (pgvector), Redis, API, worker, nginx (Cloudflare origin certs), Prometheus, Grafana
+- Automated daily Postgres backups to S3 via pg_dump
+- Single-command first-run deploy: `bash scripts/deploy.sh`
+- Grafana dashboards pre-configured for API performance, system metrics, and queue depth
+
+---
+
+## Step 7.1 — Terraform configuration
+
+**Directory:** `terraform/`
+
+**Files:**
+
+| File | Purpose |
+|---|---|
+| `main.tf` | AWS provider, backend config (S3 + DynamoDB for state locking), default VPC selection |
+| `variables.tf` | Inputs: `env`, `aws_region`, `instance_type` (default t3.medium), `ssh_key_name`, `allowed_cidr_blocks` |
+| `ec2.tf` | Ubuntu 24.04, user-data (Docker + Compose + cron), EBS gp3 (30GB root + 20GB Postgres data on `/dev/sdb`). IAM instance profile with S3 access. Elastic IP. Security group: SSH from your IP, HTTP/HTTPS from Cloudflare IPs, no public DB/Redis ports. |
+| `s3.tf` | App bucket `knowmesh-{env}-{random}` with versioning + lifecycle. Backup bucket `knowmesh-backups-{env}-{random}` with 30-day expiry. Public access blocked. |
+| `iam.tf` | IAM role for EC2 with `s3:GetObject`/`s3:PutObject` on app and backup buckets. |
+| `outputs.tf` | Instance public IP, S3 bucket names |
+
+**User-data script (`terraform/user-data.sh`):** Installs Docker, Compose, awscli. Mounts EBS data volume at `/data/postgres`. Installs cron job for daily pg_dump at 3am.
+
+**Why user-data over Ansible:** Single-instance — user-data is simpler. No agent, no inventory. Migrate to Ansible/Packer if we scale later.
+
+**Connects to:** `docker-compose.prod.yml` (step 7.2) is pulled and run on this instance.
+
+---
+
+## Step 7.2 — Production Docker Compose
+
+**File:** `docker-compose.prod.yml`
+
+**Services:**
+
+| Service | Image | Details |
+|---|---|---|
+| `postgres` | `pgvector/pgvector:pg16` | Data volume on separate EBS. Health check via `pg_isready`. |
+| `redis` | `redis:7-alpine` | AOF persistence. Health check via `redis-cli ping`. |
+| `api` | Built from `backend/Dockerfile` | 4 uvicorn workers. Env from `.env`. Depends on healthy postgres + redis. |
+| `worker` | Same Dockerfile | `python -m backend.workers.worker`. Same env. |
+| `nginx` | Built from `nginx/Dockerfile` | TLS via Cloudflare origin cert. Proxies to `api:8000`. HSTS + security headers. Ports 80 + 443. |
+| `prometheus` | `prom/prometheus:latest` | Config from `configs/prometheus.yml`. Scrapes `api:8000/metrics`. 15d data retention. |
+| `grafana` | `grafana/grafana:latest` | Dashboards from `configs/grafana/dashboards/`. Pre-configured Prometheus data source. |
+
+**New files:**
+- `configs/prometheus.yml` — scrape config for API and (optionally) postgres_exporter + node_exporter
+- `configs/grafana/dashboards/` — JSON dashboard files provisioned at container start
+- `configs/grafana/provisioning/datasources/prometheus.yaml` — auto-configures Prometheus data source
+- `configs/nginx/cloudflare-origin.conf` — nginx config for Cloudflare origin CA + IP validation
+
+**Why separate Compose file:** The dev compose mounts volumes for hot-reload and runs MinIO. Production uses S3 directly, has health checks, restart policies, and no dev-only services.
+
+**Connects to:** Terraform (step 7.1) provisions the machine. Deploy script (step 7.4) runs `docker compose -f docker-compose.prod.yml up -d`.
+
+---
+
+## Step 7.3 — Automated backups
+
+**File:** `scripts/backup-db.sh`
+
+```
+pg_dump -Fc from the postgres container → aws s3 cp to backup bucket → cleanup temp
+```
+
+**File:** `scripts/restore-db.sh`
+
+```
+aws s3 cp from backup bucket → pg_restore --clean into the postgres container
+```
+
+**Env vars:** `BACKUP_BUCKET` set via `.env` or instance tags.
+
+**Why `-Fc`:** Custom format is compressed (~5× smaller than SQL), supports parallel restore, and allows selective table restoration.
+
+**Cron:** Daily at 3am, installed via user-data script (step 7.1). 30-day retention via S3 lifecycle policy.
+
+---
+
+## Step 7.4 — First-run setup
+
+**File:** `scripts/deploy.sh`
+
+**Flow:**
+1. `terraform init && terraform apply` (provisions EC2 + S3)
+2. Print instance IP, wait for SSH available
+3. SCP: `docker-compose.prod.yml`, `.env`, `configs/`, `scripts/backup-db.sh`
+4. SSH: `docker compose pull && docker compose up -d`
+5. Wait for postgres healthy, then `docker compose exec api alembic upgrade head`
+6. Print public IP and Cloudflare DNS instructions
+
+**Why SSH-based:** No CI pipeline yet (Phase 8). Manual bootstrap is the fastest path to a running instance.
+
+---
+
+## Step 7.5 — Grafana dashboards
+
+**Directory:** `configs/grafana/dashboards/`
+
+| Dashboard | Panels |
+|---|---|
+| `api-performance.json` | Request rate, p50/p95/p99 latency, error rate by endpoint, active requests |
+| `system.json` | CPU, memory, disk (root + data), network I/O |
+| `postgres.json` | Active connections, queries/sec, cache hit ratio, disk usage |
+| `queue.json` | RQ queue depth, job throughput, failed jobs rate |
+
+**Why version dashboard JSON:** Dashboards are infrastructure. Losing them on container restart is painful. Versioning in the repo means redeploy is fully automated.
+
+---
+
+## Step 7.6 — Runbook
+
+**File:** `docs/runbook.md`
+
+**Sections:** SSH access, service status (`docker compose ps`), log tailing, restart procedures, migration commands, backup restoration, incident response flow, Cloudflare dashboard URL.
+
+**Why:** The operator shouldn't rediscover how to recover the system at 3am.
+
+---
+
+## Step 7.7 — Validation
+
+No application-level tests. Validate with:
+- `terraform plan` succeeds (no syntax errors)
+- `docker compose -f docker-compose.prod.yml config` validates Compose file
+- Manual: `bash scripts/deploy.sh` on a throwaway EC2
+
+---
+
+# Phase 8 — CI/CD & Test Expansion
+
+## Abstract Overview
+
+Add a GitHub Actions pipeline and expand test coverage to cover all new code from phases 1–7.
 
 ## Final Objective
 
@@ -990,7 +1160,7 @@ Add a GitHub Actions pipeline and expand test coverage to cover all new code fro
 
 ---
 
-## Step 7.1 — GitHub Actions workflow
+## Step 8.1 — GitHub Actions workflow
 
 **File:** `.github/workflows/ci.yml` (new)
 
@@ -1001,11 +1171,11 @@ Add a GitHub Actions pipeline and expand test coverage to cover all new code fro
 | `lint` | `ruff check backend/` + `ruff format --check backend/` |
 | `typecheck` | `mypy backend/` |
 | `test` | `pytest tests/ -v --cov=backend --cov-report=term-missing --cov-fail-under=80` |
-| `docker-build` | `docker compose -f docker-compose.yml -f docker-compose.dev.yml build` |
+| `docker-build` | `docker compose -f docker-compose.yml build` |
 
 ---
 
-## Step 7.2 — Coverage configuration
+## Step 8.2 — Coverage configuration
 
 **File:** `pyproject.toml`
 
@@ -1023,7 +1193,7 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING"]
 
 ---
 
-## Step 7.3 — New test files (one per new module)
+## Step 8.3 — New test files (one per new module)
 
 | New test file | Covers |
 |---|---|
@@ -1032,14 +1202,14 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING"]
 | `tests/api/test_upload.py` | Upload endpoint (Phase 1) |
 | `tests/api/test_auth.py` | Auth routes (Phase 4) |
 | `tests/api/test_streaming.py` | SSE endpoint (Phase 3) |
-| `tests/core/test_auth.py` | JWT + bcrypt (Phase 4) |
+| `tests/core/test_oauth.py` | OAuth (Phase 4) |
 | `tests/core/test_middleware.py` | Logging + metrics middleware (Phase 6) |
 | `tests/core/test_error_handlers.py` | Exception handlers (Phase 6) |
 | `tests/repositories/test_user_scoping.py` | Cross-user isolation (Phase 4) |
 
 ---
 
-## Step 7.4 — Update existing tests
+## Step 8.4 — Update existing tests
 
 | File | Change |
 |---|---|
@@ -1068,7 +1238,7 @@ Phase 3 (Query) — requires Phase 2 (graph populated)
 
 Phase 4 (Auth) — requires Phase 3 (full API ready)
   4.1 Deps → 4.2 Model → 4.3 Migration → 4.4 Update models
-  4.5 Auth core → 4.6 Auth dependency → 4.7 Scope repos → 4.8 Auth routes
+  4.5 OAuth core → 4.6 Auth dependency → 4.7 Scope repos → 4.8 Auth routes
   4.9 Scope handlers + 4.10 Pipeline ownership → 4.11 Tests
 
 Phase 5 (Frontend) — requires Phase 4 (auth API exists)
@@ -1079,6 +1249,10 @@ Phase 6 (Observability) — requires Phase 5 (all features exist)
   6.1 structlog → 6.2 Exceptions → 6.3 Logging middleware → 6.4 Metrics
   6.5 Health → 6.6 LLM instrumentation → 6.7 Tests
 
-Phase 7 (CI/CD) — requires Phase 6 (all code written)
-  7.1 Workflow → 7.2 Coverage config → 7.3 New tests → 7.4 Update existing
+Phase 7 (Deployment) — requires Phase 6 (observability exists)
+  7.1 Terraform → 7.2 Prod compose → 7.3 Backups → 7.4 Deploy script
+  7.5 Dashboards → 7.6 Runbook → 7.7 Validation
+
+Phase 8 (CI/CD) — requires Phase 7 (deployable)
+  8.1 Workflow → 8.2 Coverage config → 8.3 New tests → 8.4 Update existing
 ```
