@@ -18,25 +18,19 @@ class ChunkRepository:
 
     async def get_by_document(self, document_id: UUID) -> list[Chunk]:
         result = await self._session.execute(
-            select(Chunk)
-            .where(Chunk.document_id == document_id)
-            .order_by(Chunk.index)
+            select(Chunk).where(Chunk.document_id == document_id).order_by(Chunk.index)
         )
         return list(result.scalars().all())
 
     async def delete_by_document(self, document_id: UUID) -> int:
-        result = await self._session.execute(
-            delete(Chunk).where(Chunk.document_id == document_id)
-        )
+        result = await self._session.execute(delete(Chunk).where(Chunk.document_id == document_id))
         await self._session.commit()
         return result.rowcount
 
     async def get_by_ids(self, chunk_ids: list[UUID]) -> list[Chunk]:
         if not chunk_ids:
             return []
-        result = await self._session.execute(
-            select(Chunk).where(Chunk.id.in_(chunk_ids))
-        )
+        result = await self._session.execute(select(Chunk).where(Chunk.id.in_(chunk_ids)))
         return list(result.scalars().all())
 
     async def search_vector(
@@ -47,12 +41,7 @@ class ChunkRepository:
     ) -> list[tuple[Chunk, float]]:
         """Cosine similarity search via pgvector. Returns (chunk, score) where score in [0, 1]."""
         distance_col = Chunk.embedding.cosine_distance(query_embedding).label("distance")
-        stmt = (
-            select(Chunk, distance_col)
-            .where(Chunk.embedding.isnot(None))
-            .order_by(distance_col)
-            .limit(top_k)
-        )
+        stmt = select(Chunk, distance_col).where(Chunk.embedding.isnot(None)).order_by(distance_col).limit(top_k)
         if document_ids:
             stmt = stmt.where(Chunk.document_id.in_(document_ids))
         result = await self._session.execute(stmt)
@@ -68,12 +57,7 @@ class ChunkRepository:
         ts_vector = func.to_tsvector("english", Chunk.text)
         ts_query = func.plainto_tsquery("english", query_text)
         rank_col = func.ts_rank(ts_vector, ts_query).label("rank")
-        stmt = (
-            select(Chunk, rank_col)
-            .where(ts_query.op("@@")(ts_vector))
-            .order_by(rank_col.desc())
-            .limit(top_k)
-        )
+        stmt = select(Chunk, rank_col).where(ts_query.op("@@")(ts_vector)).order_by(rank_col.desc()).limit(top_k)
         if document_ids:
             stmt = stmt.where(Chunk.document_id.in_(document_ids))
         result = await self._session.execute(stmt)

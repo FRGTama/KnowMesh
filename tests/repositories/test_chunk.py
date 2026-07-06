@@ -9,10 +9,7 @@ async def test_insert_and_get_by_document(db_session, sample_document):  # noqa:
     from backend.app.models.chunk import Chunk
 
     repo = ChunkRepository(db_session)
-    chunks = [
-        Chunk(document_id=sample_document.id, index=i, text=f"t{i}", tokens=10)
-        for i in range(3)
-    ]
+    chunks = [Chunk(document_id=sample_document.id, index=i, text=f"t{i}", tokens=10) for i in range(3)]
     await repo.insert_many(chunks)
 
     result = await repo.get_by_document(sample_document.id)

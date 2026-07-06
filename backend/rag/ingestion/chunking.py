@@ -31,8 +31,7 @@ class Chunk:
 
 class BaseChunker(ABC):
     @abstractmethod
-    def chunk(self, document: Document) -> list[Chunk]:
-        ...
+    def chunk(self, document: Document) -> list[Chunk]: ...
 
 
 class RecursiveChunker(BaseChunker):
@@ -55,13 +54,15 @@ class RecursiveChunker(BaseChunker):
         while start < len(tokens):
             end = min(start + self.window_size, len(tokens))
             chunk_text = _ENCODING.decode(tokens[start:end])
-            chunks.append(Chunk(
-                text=chunk_text,
-                document_id=doc_id,
-                index=index,
-                strategy="recursive",
-                metadata={**document.metadata},
-            ))
+            chunks.append(
+                Chunk(
+                    text=chunk_text,
+                    document_id=doc_id,
+                    index=index,
+                    strategy="recursive",
+                    metadata={**document.metadata},
+                )
+            )
             index += 1
             if end == len(tokens):
                 break
@@ -92,13 +93,15 @@ class SemanticChunker(BaseChunker):
                     chunks.append(chunk)
                     index += 1
             else:
-                chunks.append(Chunk(
-                    text=para,
-                    document_id=doc_id,
-                    index=index,
-                    strategy="semantic",
-                    metadata={**document.metadata},
-                ))
+                chunks.append(
+                    Chunk(
+                        text=para,
+                        document_id=doc_id,
+                        index=index,
+                        strategy="semantic",
+                        metadata={**document.metadata},
+                    )
+                )
                 index += 1
         return chunks
 

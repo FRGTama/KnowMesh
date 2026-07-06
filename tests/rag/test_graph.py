@@ -34,9 +34,7 @@ async def test_search_scores_by_jaccard_overlap(graph_service: GraphService):
     chunk_id = uuid4()
 
     graph_service._entities.search_by_text = AsyncMock(return_value=[e1, e2])
-    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(
-        return_value=[(chunk_id, 2)]
-    )
+    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(return_value=[(chunk_id, 2)])
 
     result = await graph_service.search("matching query", top_k=10)
     assert len(result) == 1
@@ -53,9 +51,7 @@ async def test_search_partial_overlap(graph_service: GraphService):
     chunk_b = uuid4()
 
     graph_service._entities.search_by_text = AsyncMock(return_value=[e1, e2, e3])
-    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(
-        return_value=[(chunk_a, 2), (chunk_b, 1)]
-    )
+    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(return_value=[(chunk_a, 2), (chunk_b, 1)])
 
     result = await graph_service.search("query", top_k=10)
     assert len(result) == 2
@@ -71,9 +67,7 @@ async def test_search_respects_top_k(graph_service: GraphService):
     chunk_ids = [uuid4() for _ in range(5)]
 
     graph_service._entities.search_by_text = AsyncMock(return_value=entities)
-    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(
-        return_value=[(cid, 1) for cid in chunk_ids]
-    )
+    graph_service._chunk_entities.get_chunks_for_entities = AsyncMock(return_value=[(cid, 1) for cid in chunk_ids])
 
     result = await graph_service.search("query", top_k=3)
     assert len(result) == 3

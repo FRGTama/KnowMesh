@@ -17,6 +17,7 @@ class DocumentRepository:
             file_type=data.file_type,
             file_size=data.file_size,
             file_hash=data.file_hash,
+            s3_key=data.s3_key,
             strategy=data.strategy,
             meta=data.meta,
         )
@@ -26,23 +27,16 @@ class DocumentRepository:
         return document
 
     async def get_by_id(self, document_id: UUID) -> Document | None:
-        result = await self._session.execute(
-            select(Document).where(Document.id == document_id)
-        )
+        result = await self._session.execute(select(Document).where(Document.id == document_id))
         return result.scalar_one_or_none()
 
     async def get_by_hash(self, file_hash: str) -> Document | None:
-        result = await self._session.execute(
-            select(Document).where(Document.file_hash == file_hash)
-        )
+        result = await self._session.execute(select(Document).where(Document.file_hash == file_hash))
         return result.scalar_one_or_none()
 
     async def list(self, limit: int = 50, offset: int = 0) -> list[Document]:
         result = await self._session.execute(
-            select(Document)
-            .order_by(Document.created_at.desc())
-            .limit(limit)
-            .offset(offset)
+            select(Document).order_by(Document.created_at.desc()).limit(limit).offset(offset)
         )
         return list(result.scalars().all())
 
@@ -50,15 +44,11 @@ class DocumentRepository:
         fields = data.model_dump(exclude_unset=True)
         if not fields:
             return await self.get_by_id(document_id)
-        await self._session.execute(
-            update(Document).where(Document.id == document_id).values(**fields)
-        )
+        await self._session.execute(update(Document).where(Document.id == document_id).values(**fields))
         await self._session.commit()
         return await self.get_by_id(document_id)
 
     async def delete(self, document_id: UUID) -> bool:
-        result = await self._session.execute(
-            delete(Document).where(Document.id == document_id)
-        )
+        result = await self._session.execute(delete(Document).where(Document.id == document_id))
         await self._session.commit()
         return result.rowcount > 0

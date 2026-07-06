@@ -1,5 +1,5 @@
 from backend.schemas.chunk import ChunkResponse
-from backend.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate
+from backend.schemas.document import DocumentCreate, DocumentResponse, DocumentUpdate, UploadResponse
 from backend.schemas.entity import DocumentGraphResponse, EntityResponse
 from backend.schemas.provider import ProviderConfig, ProviderStatus
 from backend.schemas.query import Citation, QueryRequest, QueryResponse
@@ -18,4 +18,5 @@ __all__ = [
     "QueryRequest",
     "QueryResponse",
     "RelationResponse",
+    "UploadResponse",
 ]

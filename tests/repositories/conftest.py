@@ -16,6 +16,7 @@ def _skip_if_no_db():
     if not DB_AVAILABLE:
         pytest.skip("test database not available")
 
+
 _test_engine = create_async_engine(TEST_DATABASE_URL)
 _TestSessionLocal = async_sessionmaker(_test_engine, class_=AsyncSession, expire_on_commit=False)
 

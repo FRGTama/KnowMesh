@@ -18,8 +18,7 @@ class GenerateClient(Protocol):
         user_prompt: str,
         temperature: float = 0.3,
         max_tokens: int = 1024,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 class OpenAICompatibleClient:

@@ -14,8 +14,7 @@ class Document:
 
 class DocumentLoader(ABC):
     @abstractmethod
-    def load(self, path: Path, base_metadata: dict[str, Any]) -> list[Document]:
-        ...
+    def load(self, path: Path, base_metadata: dict[str, Any]) -> list[Document]: ...
 
 
 class TextLoader(DocumentLoader):
@@ -35,14 +34,16 @@ class LiteParseLoader(DocumentLoader):
         for page in result.pages:
             text = page.text.strip()
             if text:
-                documents.append(Document(
-                    text=text,
-                    metadata={
-                        **base_metadata,
-                        "page": page.page_num - 1,
-                        "total_pages": len(result.pages),
-                    },
-                ))
+                documents.append(
+                    Document(
+                        text=text,
+                        metadata={
+                            **base_metadata,
+                            "page": page.page_num - 1,
+                            "total_pages": len(result.pages),
+                        },
+                    )
+                )
         if not documents:
             return [Document(text="", metadata={**base_metadata, "error": "No extractable text"})]
         return documents
@@ -96,8 +97,10 @@ def load(
 
     loader = r.get_loader(ext)
     if loader is None:
-        return [Document(
-            text=f"[Unsupported file type: {ext}. Supported: {', '.join(r.supported_extensions)}]",
-            metadata={**base_metadata, "error": f"Loader not implemented for {ext}"},
-        )]
+        return [
+            Document(
+                text=f"[Unsupported file type: {ext}. Supported: {', '.join(r.supported_extensions)}]",
+                metadata={**base_metadata, "error": f"Loader not implemented for {ext}"},
+            )
+        ]
     return loader.load(path_obj, base_metadata)

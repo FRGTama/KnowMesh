@@ -17,15 +17,11 @@ class ChunkEntityRepository:
         await self._session.commit()
 
     async def get_by_chunk(self, chunk_id: UUID) -> list[ChunkEntity]:
-        result = await self._session.execute(
-            select(ChunkEntity).where(ChunkEntity.chunk_id == chunk_id)
-        )
+        result = await self._session.execute(select(ChunkEntity).where(ChunkEntity.chunk_id == chunk_id))
         return list(result.scalars().all())
 
     async def get_by_entity(self, entity_id: UUID) -> list[ChunkEntity]:
-        result = await self._session.execute(
-            select(ChunkEntity).where(ChunkEntity.entity_id == entity_id)
-        )
+        result = await self._session.execute(select(ChunkEntity).where(ChunkEntity.entity_id == entity_id))
         return list(result.scalars().all())
 
     async def get_chunks_for_entities(self, entity_ids: list[UUID]) -> list[tuple[UUID, int]]:
@@ -43,8 +39,6 @@ class ChunkEntityRepository:
     async def delete_by_chunk(self, chunk_id: UUID) -> int:
         from sqlalchemy import delete
 
-        result = await self._session.execute(
-            delete(ChunkEntity).where(ChunkEntity.chunk_id == chunk_id)
-        )
+        result = await self._session.execute(delete(ChunkEntity).where(ChunkEntity.chunk_id == chunk_id))
         await self._session.commit()
         return result.rowcount

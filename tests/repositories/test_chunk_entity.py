@@ -32,10 +32,7 @@ async def test_get_by_entity(db_session, sample_chunks, sample_document):  # noq
     await db_session.commit()
     await db_session.refresh(entity)
 
-    links = [
-        ChunkEntity(chunk_id=c.id, entity_id=entity.id)
-        for c in sample_chunks[:2]
-    ]
+    links = [ChunkEntity(chunk_id=c.id, entity_id=entity.id) for c in sample_chunks[:2]]
     repo = ChunkEntityRepository(db_session)
     await repo.insert_many(links)
 
@@ -55,11 +52,13 @@ async def test_get_chunks_for_entities(db_session, sample_chunks, sample_documen
     await db_session.refresh(e2)
 
     repo = ChunkEntityRepository(db_session)
-    await repo.insert_many([
-        ChunkEntity(chunk_id=sample_chunks[0].id, entity_id=e1.id),
-        ChunkEntity(chunk_id=sample_chunks[0].id, entity_id=e2.id),
-        ChunkEntity(chunk_id=sample_chunks[1].id, entity_id=e1.id),
-    ])
+    await repo.insert_many(
+        [
+            ChunkEntity(chunk_id=sample_chunks[0].id, entity_id=e1.id),
+            ChunkEntity(chunk_id=sample_chunks[0].id, entity_id=e2.id),
+            ChunkEntity(chunk_id=sample_chunks[1].id, entity_id=e1.id),
+        ]
+    )
 
     result = await repo.get_chunks_for_entities([e1.id, e2.id])
     assert len(result) == 2

@@ -16,6 +16,7 @@ class Document(Base, TimestampMixin):
     file_type: Mapped[str] = mapped_column(String(20), nullable=False)
     file_size: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    s3_key: Mapped[str] = mapped_column(String, nullable=False, default="")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", index=True)
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="recursive")
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

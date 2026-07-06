@@ -21,14 +21,11 @@ class RelationRepository:
             return []
         result = await self._session.execute(
             select(Relation).where(
-                (Relation.source_entity_id.in_(entity_ids))
-                | (Relation.target_entity_id.in_(entity_ids))
+                (Relation.source_entity_id.in_(entity_ids)) | (Relation.target_entity_id.in_(entity_ids))
             )
         )
         return list(result.scalars().all())
 
     async def get_by_document(self, document_id: UUID) -> list[Relation]:
-        result = await self._session.execute(
-            select(Relation).where(Relation.document_id == document_id)
-        )
+        result = await self._session.execute(select(Relation).where(Relation.document_id == document_id))
         return list(result.scalars().all())

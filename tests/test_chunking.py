@@ -42,7 +42,9 @@ def test_semantic_chunker_single_paragraph():
 
 
 def test_semantic_chunker_multi_paragraph():
-    doc = Document(text="Para one.\n\nPara two.\n\nPara three.", metadata={"filename": "test.txt", "document_id": str(_DOC_ID)})
+    doc = Document(
+        text="Para one.\n\nPara two.\n\nPara three.", metadata={"filename": "test.txt", "document_id": str(_DOC_ID)}
+    )
     chunks = SemanticChunker(window_size=512).chunk(doc)
     assert len(chunks) == 3
     assert all(c.strategy == "semantic" for c in chunks)

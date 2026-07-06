@@ -54,9 +54,7 @@ async def test_query_returns_answer_and_citations(retrieval_service: RetrievalSe
     chunk1 = _make_chunk(cid1, "context one about mitochondria")
     chunk2 = _make_chunk(cid2, "context two about ATP synthesis")
 
-    retrieval_service._chunk_repo.search_vector = AsyncMock(
-        return_value=[(chunk1, 0.9), (chunk2, 0.7)]
-    )
+    retrieval_service._chunk_repo.search_vector = AsyncMock(return_value=[(chunk1, 0.9), (chunk2, 0.7)])
     retrieval_service._chunk_repo.search_fts = AsyncMock(return_value=[])
     retrieval_service._graph.search = AsyncMock(return_value=[])
 

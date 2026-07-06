@@ -1,5 +1,6 @@
 from rq import Worker
 
+import backend.workers.jobs  # noqa: F401 — RQ resolves job functions by module path
 from backend.app.config import get_settings
 
 

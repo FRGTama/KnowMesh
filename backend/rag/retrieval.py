@@ -57,12 +57,8 @@ class RetrievalService:
 
         query_embedding = (await self._embedder.embed([query]))[0]
 
-        vector_results = await self._chunk_repo.search_vector(
-            query_embedding, top_k=top_k, document_ids=document_ids
-        )
-        fts_results = await self._chunk_repo.search_fts(
-            query, top_k=top_k, document_ids=document_ids
-        )
+        vector_results = await self._chunk_repo.search_vector(query_embedding, top_k=top_k, document_ids=document_ids)
+        fts_results = await self._chunk_repo.search_fts(query, top_k=top_k, document_ids=document_ids)
         graph_results = await self._graph.search(query, top_k=top_k)
 
         return self._merge_scores(vector_results, fts_results, graph_results)

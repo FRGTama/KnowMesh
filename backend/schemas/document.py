@@ -5,6 +5,17 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class UploadResponse(BaseModel):
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    id: UUID
+    filename: str
+    status: str
+    file_size: int
+    file_hash: str | None
+    created_at: datetime
+
+
 class DocumentCreate(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -12,6 +23,7 @@ class DocumentCreate(BaseModel):
     file_type: str = Field(max_length=20)
     file_size: int = Field(default=0, ge=0)
     file_hash: str | None = None
+    s3_key: str = ""
     strategy: str = "recursive"
     meta: dict[str, Any] = Field(default_factory=dict)
 
@@ -34,6 +46,7 @@ class DocumentResponse(BaseModel):
     file_type: str
     file_size: int
     file_hash: str | None
+    s3_key: str
     status: str
     strategy: str
     chunk_count: int

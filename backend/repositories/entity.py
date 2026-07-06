@@ -17,17 +17,13 @@ class EntityRepository:
         await self._session.commit()
 
     async def get_by_document(self, document_id: UUID) -> list[Entity]:
-        result = await self._session.execute(
-            select(Entity).where(Entity.document_id == document_id)
-        )
+        result = await self._session.execute(select(Entity).where(Entity.document_id == document_id))
         return list(result.scalars().all())
 
     async def find_by_names(self, names: list[str]) -> list[Entity]:
         if not names:
             return []
-        result = await self._session.execute(
-            select(Entity).where(Entity.name.in_(names))
-        )
+        result = await self._session.execute(select(Entity).where(Entity.name.in_(names)))
         return list(result.scalars().all())
 
     async def search_by_text(self, query_text: str) -> list[Entity]:
@@ -36,7 +32,5 @@ class EntityRepository:
         if not tokens:
             return []
         conditions = [Entity.name.ilike(f"%{token}%") for token in tokens]
-        result = await self._session.execute(
-            select(Entity).where(or_(*conditions))
-        )
+        result = await self._session.execute(select(Entity).where(or_(*conditions)))
         return list(result.scalars().all())
